@@ -36,6 +36,7 @@ namespace cpmd {
 
         private:
             Status InitSock(int port, int timeout);
+            Status Communicates(const ProtocolMessage& req, ProtocolMessage* res);
             Status SendAndRecv(const void* req, size_t req_size, 
                     void* resp, size_t resp_size);
             using ProcessBusPtr = std::unique_ptr<alpha::ProcessBus>;

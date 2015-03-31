@@ -22,7 +22,7 @@ namespace cpmd {
     const static std::size_t kMaxMessageDataSize = (1 << 16) - 100;
 
     struct Message {
-        uint64_t addr;
+        uint32_t addr;
         int32_t len;
         char data[kMaxMessageDataSize];
     };
@@ -31,20 +31,22 @@ namespace cpmd {
         private:
             enum class Code {
                 kOk = 0,
+                kInitError,
                 kInvalidAddress,
                 kNoSpaceLeft,
-                kHandShakeError,
                 kNoMessage,
+                kCommunicateError,
                 kUnknwonError
             };
 
         public:
             Status(Status::Code code = Code::kOk);
             static Status OK();
+            static Status InitError(const alpha::Slice& msg);
             static Status InvalidAddress(const alpha::Slice& msg);
-            static Status HandShakeError(const alpha::Slice& msg);
             static Status NoSpace(const alpha::Slice& msg);
             static Status NoMessage();
+            static Status CommunicateError(const alpha::Slice& msg);
             static Status Error(Status::Code code, const alpha::Slice& msg);
 
             bool ok() const { return code_ == Code::kOk; }
@@ -66,11 +68,14 @@ namespace cpmd {
 
     class Address {
         public:
-            std::size_t HashCode() const;
+            Address();
+            uint32_t HashCode() const;
             bool Match(const alpha::Slice& full_address) const;
+            static Address Create(const alpha::Slice& addr);
         private:
+            explicit Address(uint32_t hash_code);
             friend class PortMapperClientImpl;
-            std::size_t hash_code_;
+            uint32_t hash_code_;
     };
 
     class PortMapperClient {
