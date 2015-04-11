@@ -10,8 +10,9 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG")
 
 include_directories(include)
 include_directories(alpha)
-list(APPEND srcs src/cpmd_impl.cc)
+#list(APPEND srcs src/cpmd_impl.cc)
 
 add_subdirectory(alpha)
-add_library(${LIB_CPMD_CLIENT} STATIC ${srcs})
-add_subdirectory(example)
+add_subdirectory(cpm)
+#add_library(${LIB_CPMD_CLIENT} STATIC ${srcs})
+#add_subdirectory(example)
