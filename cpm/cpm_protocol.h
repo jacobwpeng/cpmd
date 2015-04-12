@@ -32,7 +32,7 @@ namespace cpm {
         template<typename T>
         typename std::enable_if< std::is_pod<T>::value 
                              && !std::is_pointer<T>::value && 
-                             sizeof(T) < kMaxProtocolDataSize
+                             sizeof(T) <= kMaxProtocolDataSize
             , T>::type* as() {
                 return reinterpret_cast<T*>(data);
         }

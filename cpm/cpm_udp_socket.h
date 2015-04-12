@@ -35,8 +35,7 @@ namespace cpm {
                                 && std::is_pod<ReceiveType>::value, Status>::type 
                     SendAndRecv(const SendType& in, ReceiveType* out, int timeout_ms = -1) {
                 std::string buf;
-                auto status = SendAndRecv(alpha::Slice(reinterpret_cast<const char*>(&in), sizeof(in)), 
-                        &buf, timeout_ms);
+                auto status = SendAndRecv(&in, &buf, timeout_ms);
                 if (status != Status::kOk) {
                     return status;
                 }

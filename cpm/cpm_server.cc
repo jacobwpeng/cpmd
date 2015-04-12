@@ -101,7 +101,7 @@ namespace cpm {
             ::strncpy(reply->output_tunnel_path, input_bus_path.data(), input_bus_path.size());
             ::strncpy(reply->input_tunnel_path, output_bus_path.data(), output_bus_path.size());
         }
-        out->assign(reinterpret_cast<const char*>(&m), sizeof(m));
+        *out = alpha::Slice(&m).ToString();
         return 0;
     }
 

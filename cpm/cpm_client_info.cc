@@ -12,6 +12,7 @@
 
 #include "cpm_client_info.h"
 #include <cassert>
+#include <alpha/compiler.h>
 #include <alpha/process_bus.h>
 #include <alpha/logger.h>
 #include "cpm_message.h"
@@ -44,12 +45,19 @@ namespace cpm {
         char* data = input_->Read(&len);
         if (data == nullptr) {
             return false;
-        } else if (len < Message::kMinSize) {
+        } else if (unlikely(len < Message::kMinSize)) {
             LOG_WARNING << "Drop truncated message from " << name_
                 << ", len = " << len;
             return false;
         } else {
-            *m = reinterpret_cast<Message*>(data);
+            auto message = reinterpret_cast<Message*>(data);
+            if (unlikely(message->Size() >= Message::kMaxDataSize)) {
+                LOG_WARNING << "Drop invalid message from " << name_
+                    << ", message->Size() = " << message->Size();
+                return false;
+            } else {
+                *m = message;
+            }
             return true;
         }
     }

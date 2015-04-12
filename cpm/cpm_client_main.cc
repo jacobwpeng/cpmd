@@ -11,6 +11,7 @@
  */
 
 #include <libgen.h>
+#include <cassert>
 #include <alpha/logger.h>
 #include "cpm.h"
 
@@ -19,12 +20,12 @@ int main(int argc, char* argv[]) {
     cpm::Client * client = nullptr;
     char* basename = ::basename(argv[0]);
     auto status = cpm::Client::Create(&client, basename);
+    const std::string msg = "Long live the queen!";
     if (status != cpm::Status::kOk) {
         LOG_ERROR << "Create failed, status = " << static_cast<int>(status);
         return EXIT_FAILURE;
     } else {
         auto self_addr = cpm::Address::Create(basename);
-        std::string msg = "Long live the queen!";
         cpm::Message m = cpm::Message::Default();
         m.SetRemoteAddress(self_addr);
         m.SetData(msg);
@@ -48,6 +49,7 @@ int main(int argc, char* argv[]) {
             status = client->ReceiveMessage(&m);
             if (status == cpm::Status::kOk) {
                 LOG_INFO << "Receive " << 1 << " message";
+                assert (m->Data() == msg);
                 --num;
                 if (num == 0) {
                     break;
