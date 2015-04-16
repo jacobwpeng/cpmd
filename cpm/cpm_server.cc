@@ -69,13 +69,14 @@ namespace cpm {
             return -1;
         }
 
+        alpha::Slice received(data, len);
+
         //TODO: Check MagicNum
-        ProtocolMessage received;
-        ::memcpy(&received, data, len);
-        auto * req = received.as<HandShakeRequest>();
+        auto * req = received.as<ProtocolMessage>()->as<const HandShakeRequest*>();
         //TODO: Check buffer_size
         ProtocolMessage m;
-        auto * reply = m.as<HandShakeResponse>();
+        auto * reply = m.as<HandShakeResponse*>();
+        //TODO: check req->name
         LOG_INFO << "HandShakeRequest from " << req->name;
 
         auto input_bus_path = GetInputBusPath(req->name);
@@ -98,8 +99,10 @@ namespace cpm {
             assert (input_bus_path.size() < sizeof(reply->input_tunnel_path));
             assert (output_bus_path.size() < sizeof(reply->output_tunnel_path));
             //对方的output就是我们的input
-            ::strncpy(reply->output_tunnel_path, input_bus_path.data(), input_bus_path.size());
-            ::strncpy(reply->input_tunnel_path, output_bus_path.data(), output_bus_path.size());
+            ::strncpy(reply->output_tunnel_path, input_bus_path.data(), 
+                    input_bus_path.size());
+            ::strncpy(reply->input_tunnel_path, output_bus_path.data(), 
+                    output_bus_path.size());
         }
         *out = alpha::Slice(&m).ToString();
         return 0;

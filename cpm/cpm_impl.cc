@@ -31,7 +31,7 @@ namespace cpm {
             return status;
         }
         ProtocolMessage m;
-        auto * req = m.as<HandShakeRequest>();
+        auto * req = m.as<HandShakeRequest*>();
         assert (name_.size() <= kMaxNameSize - 1);
         ::strncpy(req->name, name_.data(), kMaxNameSize);
         req->buffer_size = options_.buffer_size();
@@ -41,7 +41,7 @@ namespace cpm {
             return status;
         }
 
-        auto * resp = reply.as<HandShakeResponse>();
+        auto * resp = reply.as<HandShakeResponse*>();
 
         input_ = std::move(alpha::ProcessBus::RestoreFrom(resp->input_tunnel_path,
                     options_.buffer_size()));

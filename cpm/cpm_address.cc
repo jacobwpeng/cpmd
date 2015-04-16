@@ -26,14 +26,19 @@ namespace cpm {
 
     Address Address::Create(alpha::Slice readable_address) {
         alpha::Slice client_addr;
+        Address addr;
         if (readable_address.find("/") == alpha::Slice::npos) {
-            Address addr;
+            // 本地客户端地址
             addr.node_addr_ = 0;
             addr.client_addr_ = Hash(readable_address);
             return addr;
+        } else if (readable_address.ToString().back() == '/') {
+            // 节点地址
+            addr.node_addr_ = Hash(readable_address);
+            addr.client_addr_ = 0;
+            return addr;
         } else {
             auto node_addr = GetNodeAddress(readable_address, &client_addr);
-            Address addr;
             addr.node_addr_ = Hash(node_addr);
             addr.client_addr_ = Hash(client_addr);
             return addr;
