@@ -49,6 +49,8 @@ namespace cpm {
         service_server_->SetOnNewConnection(std::bind(&ResolveServer::OnNewConnection, 
                     this, _1));
         service_server_->SetOnClose(std::bind(&ResolveServer::OnClose, this, _1));
+        protocol_message_codec_->SetOnMessage(std::bind(&ResolveServer::OnMessage,
+                    this, _1, _2));
         if (service_server_->Run() == false) {
             LOG_ERROR << "Run service server failed";
             return false;
@@ -86,6 +88,7 @@ namespace cpm {
         auto builder = ResolveResponse::Builder(&reply);
         bool preserve_connection = true;
         if (req->type == ResolveRequestType::kInitializeSelf) {
+            LOG_INFO << "Initialize request from " << conn->PeerAddr();
             preserve_connection = HandleNodeInit(conn, req, &reply);
         } else if (req->type == ResolveRequestType::kLookupNode) {
             preserve_connection = HandleNodeLookup(conn, req, &reply);
@@ -159,6 +162,7 @@ namespace cpm {
             builder.SetNodeIp(node->net_addr().ip());
             builder.SetNodePort(node->net_addr().port());
             builder.SetNodeAddress(node->node_addr());
+            builder.SetNodePath(node->readable_addr());
         }
         return true;
     }

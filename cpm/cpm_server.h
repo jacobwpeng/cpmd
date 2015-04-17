@@ -31,6 +31,9 @@ namespace alpha {
 namespace cpm {
     class Message;
     class ClientInfo;
+    struct ProtocolMessage;
+    struct ResolveResponse;
+    class ProtocolMessageCodec;
     class Server {
         public:
             Server(alpha::EventLoop* loop, alpha::Slice bus_location);
@@ -52,6 +55,22 @@ namespace cpm {
             int HandleBusMessage(int64_t);
             void HandleLocalMessage(Message* m);
             void HandleRemoteMessage(Message* m);
+            void HandleResolveServerMessage(alpha::TcpConnectionPtr& conn,
+                    const ProtocolMessage& m);
+            void OnConnectedToRemote(alpha::TcpConnectionPtr conn);
+            void OnConnectToRemoteError(const alpha::NetAddress& addr);
+            void OnConnectToRemoteClose(alpha::TcpConnectionPtr conn);
+            bool IsResolveServerAddress(const alpha::NetAddress& addr);
+
+            void OnConnectedToResolveServer(alpha::TcpConnectionPtr& conn);
+            void OnConnectedToResolveServerError(const alpha::NetAddress& addr);
+            void OnResolveServerDisconnected(alpha::TcpConnectionPtr& conn);
+            void OnConnectedToRemoteNode(alpha::TcpConnectionPtr& conn);
+            void OnConnectToRemoteNodeError(const alpha::NetAddress& addr);
+            void OnRemoteNodeDisconnected(alpha::TcpConnectionPtr& conn);
+            void ReconnectToResolveServer(const alpha::NetAddress& addr);
+            bool UpdateSelfAddress(const ResolveResponse* resp);
+            bool UpdateNodeAddressCache(const ResolveResponse* resp);
             std::string GetInputBusPath(alpha::Slice name) const;
             std::string GetOutputBusPath(alpha::Slice name) const;
             std::string GetBusPath(alpha::Slice fmt, alpha::Slice name) const;
@@ -64,10 +83,13 @@ namespace cpm {
             std::string bus_location_;
             std::unique_ptr<alpha::UdpServer> register_server_;
             std::unique_ptr<alpha::TcpServer> message_server_;
-            std::unique_ptr<alpha::TcpClient> message_dispater_;
+            std::unique_ptr<alpha::TcpClient> client_;
+            std::unique_ptr<ProtocolMessageCodec> protocol_message_codec_;
+            std::unique_ptr<alpha::NetAddress> resolve_server_address_;
             std::map<Address::NodeAddressType, alpha::TcpConnectionPtr> nodes_;
             std::map<Address::NodeAddressType, alpha::TcpConnectionPtr> out_links_;
             std::map<Address::ClientAddressType, ClientPtr> clients_;
+            std::map<Address::NodeAddressType, alpha::NetAddress> cached_node_addresses_;
     };
 }
 
