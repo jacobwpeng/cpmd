@@ -55,6 +55,14 @@ namespace cpm {
         return alpha::Slice(address.data(), pos);
     }
 
+    Address Address::CreateDirectly(NodeAddressType node_addr, 
+            ClientAddressType client_addr) {
+        Address addr;
+        addr.node_addr_ = node_addr;
+        addr.client_addr_ = client_addr;
+        return addr;
+    }
+
     uint32_t Address::Hash(alpha::Slice addr) {
         // MurmurHash 32-bit
         static const uint32_t c1 = 0xcc9e2d51;

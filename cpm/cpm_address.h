@@ -19,11 +19,12 @@
 namespace cpm {
     class Address {
         public:
-            static Address Default();
-            static Address Create(alpha::Slice readable_address);
-
             using NodeAddressType = uint32_t;
             using ClientAddressType = uint32_t;
+            static const NodeAddressType kLocalNodeAddress = 0;
+
+            static Address Default();
+            static Address Create(alpha::Slice readable_address);
 
             NodeAddressType NodeAddress() const;
             ClientAddressType ClientAddress() const;
@@ -33,7 +34,10 @@ namespace cpm {
         private:
             static uint32_t Hash(alpha::Slice address);
             static alpha::Slice GetNodeAddress(alpha::Slice address, alpha::Slice* left);
+            static Address CreateDirectly(NodeAddressType node_addr, 
+                    ClientAddressType client_addr);
             friend class Message;
+            friend class Server;
             Address() = default;
             NodeAddressType node_addr_;
             ClientAddressType client_addr_;
