@@ -28,7 +28,9 @@ namespace cpm {
     static const int kMaxIpSize = 16; //255.255.255.255\0
 
     enum class MessageType : int16_t {
-        kHandShake = 1,
+        kClientHandShake = 1,
+        kResolveRequest = 2,
+        kResolveResponse = 3,
     };
 
     struct ProtocolMessage {
@@ -100,9 +102,21 @@ namespace cpm {
 
     struct ResolveRequest {
         ResolveRequestType type;
-        uint32_t self_addr;
+        Address::NodeAddressType self_addr;
         int32_t cpmd_port;
         char node_path[kMaxNodePathSize];
+
+        class Builder {
+            public:
+                Builder(ProtocolMessage* m);
+                Builder& SetType(ResolveRequestType type);
+                Builder& SetSelfAddress(Address::NodeAddressType addr);
+                Builder& SetPort(int32_t port);
+                Builder& SetNodePath(alpha::Slice path);
+
+            private:
+                ProtocolMessage* m_;
+        };
     };
 
     struct ResolveResponse {
@@ -124,8 +138,6 @@ namespace cpm {
                 Builder& SetNodePath(alpha::Slice path);
 
             private:
-                ResolveResponse* resp();
-                Builder& EnsureLength(int len);
                 ProtocolMessage* m_;
         };
 
@@ -149,6 +161,9 @@ namespace cpm {
     ASSERT_POD_TYPE(HandShakeResponse);
     ASSERT_POD_TYPE(ResolveRequest);
     ASSERT_POD_TYPE(ResolveResponse);
+
+#undef ASSERT_POD_TYPE
+#undef ASSERT_TYPE_SIZE
 }
 
 #endif   /* ----- #ifndef __CPM_PROTOCOL_H__  ----- */

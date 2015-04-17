@@ -15,61 +15,65 @@
 #include <cstring>
 
 namespace cpm {
-    ResolveResponse::Builder::Builder(ProtocolMessage* m)
-        :m_(m) {
-        m_->len = 0;
-    }
-#define MinSizeWithField(type, field) \
-    offsetof(type, field) + sizeof(type::field)
-
-    ResolveResponse::Builder& ResolveResponse::Builder::SetCode(
-            cpm::ResolveServerError code) {
-        resp()->code = code;
-        return EnsureLength(MinSizeWithField(ResolveResponse, code));
-    }
-
-    ResolveResponse::Builder& ResolveResponse::Builder::SetType(
-            ResolveResponseType type) {
-        resp()->type = type;
-        return EnsureLength(MinSizeWithField(ResolveResponse, type));
-    }
-
-    ResolveResponse::Builder& ResolveResponse::Builder::SetNodeAddress(
-            Address::NodeAddressType addr) {
-        resp()->node_addr = addr;
-        return EnsureLength(MinSizeWithField(ResolveResponse, node_addr));
-    }
-
-    ResolveResponse::Builder& ResolveResponse::Builder::SetNodeIp(alpha::Slice ip) {
-        assert (sizeof(ResolveResponse::node_ip) > ip.size());
-        ::strncpy(resp()->node_ip, ip.data(), ip.size());
-        return EnsureLength(MinSizeWithField(ResolveResponse, node_ip));
-    }
-
-    ResolveResponse::Builder& ResolveResponse::Builder::SetNodePort(int32_t port) {
-        resp()->node_port = port;
-        return EnsureLength(MinSizeWithField(ResolveResponse, node_port));
-    }
-
-    ResolveResponse::Builder& ResolveResponse::Builder::SetNodePath(alpha::Slice path) {
-        static_assert(MinSizeWithField(ResolveResponse, node_path) 
-                == sizeof(ResolveResponse), "node_path must be the last element of "
-                "ResolveResponse");
-        assert (sizeof(ResolveResponse::node_path) > path.size());
-        ::strncpy(resp()->node_path, path.data(), path.size());
-        m_->len = offsetof(ResolveResponse, node_path) + path.size();
-        return *this;
-    }
-
-    ResolveResponse* ResolveResponse::Builder::resp() {
-        return m_->as<ResolveResponse*>();
-    }
-
-    ResolveResponse::Builder& ResolveResponse::Builder::EnsureLength(int len) {
-        if (m_->len < len) {
-            m_->len = len;
+    template<typename T>
+    T& EnsureLength(T* cls, cpm::ProtocolMessage* m, size_t size) {
+        if (m->len < size) {
+            m->len = size;
         }
-        assert (m_->len <= sizeof(ProtocolMessage::data));
-        return *this;
+        return *cls;
     }
+
+#define MinSizeWithField(Type, Field)                                          \
+    offsetof(Type, Field) + sizeof(Type::Field)
+
+#define DefineBuilderConstructor(Type, MessageType)                            \
+    Type::Builder::Builder(ProtocolMessage* m)                                 \
+    :m_(m) {                                                                   \
+        m_->magic = kProtocolMessageMagic;                                     \
+        m_->type = MessageType;                                                \
+        m_->len = 0;                                                           \
+    }                                           
+
+#define DefineFieldSetter(Type, Field, FieldName, ArgType)                     \
+    Type::Builder& Type::Builder::Set##FieldName(ArgType Field) {              \
+        m_->as<Type*>()->Field = Field;                                        \
+        return EnsureLength(this, m_, MinSizeWithField(Type, Field));          \
+    }
+
+#define DefineStringFieldSetter(Type, Field, FieldName)                        \
+    Type::Builder& Type::Builder::Set##FieldName(alpha::Slice Field) {         \
+    assert (sizeof(Type::Field) > Field.size());                               \
+    ::strncpy(m_->as<Type*>()->Field, Field.data(), Field.size());             \
+    return EnsureLength(this, m_, MinSizeWithField(Type, Field));              \
+    }
+
+#define DefineLastFieldSetter(Type, Field, FieldName)                          \
+    Type::Builder& Type::Builder::Set##FieldName(alpha::Slice Field) {         \
+        static_assert(MinSizeWithField(Type, Field)                            \
+                == sizeof(Type), #Field" must be the last element of "#Type);  \
+        assert (sizeof(Type::Field) > Field.size());                           \
+        ::strncpy(m_->as<Type*>()->Field, Field.data(), Field.size());         \
+        m_->len = offsetof(Type, Field) + Field.size();                        \
+        return *this;                                                          \
+    }
+
+    DefineBuilderConstructor(ResolveRequest, MessageType::kResolveRequest);
+    DefineFieldSetter(ResolveRequest, type, Type, ResolveRequestType)
+    DefineFieldSetter(ResolveRequest, self_addr, SelfAddress, Address::NodeAddressType)
+    DefineFieldSetter(ResolveRequest, cpmd_port, Port, int32_t)
+    DefineLastFieldSetter(ResolveRequest, node_path, NodePath)
+
+    DefineBuilderConstructor(ResolveResponse, MessageType::kResolveResponse);
+    DefineFieldSetter(ResolveResponse, code, Code, cpm::ResolveServerError)
+    DefineFieldSetter(ResolveResponse, type, Type, ResolveResponseType)
+    DefineFieldSetter(ResolveResponse, node_addr, NodeAddress, Address::NodeAddressType)
+    DefineFieldSetter(ResolveResponse, node_port, NodePort, int32_t)
+    DefineStringFieldSetter(ResolveResponse, node_ip, NodeIp)
+    DefineLastFieldSetter(ResolveResponse, node_path, NodePath)
+
+#undef MinSizeWithField
+#undef DefineBuilderConstructor
+#undef DefineFieldSetter
+#undef DefineStringFieldSetter
+#undef DefineLastFieldSetter
 }
