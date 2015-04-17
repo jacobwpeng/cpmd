@@ -34,14 +34,13 @@ namespace cpm {
             buf->ConsumeBytes(data.size());
             return;
         }
-
-        if (message_callback_) {
-            message_callback_(conn, *m);
-        }
         DLOG_INFO << "New ProtocolMessage from " << conn->PeerAddr()
             << ", m->type = " << 
             static_cast<typename std::underlying_type<decltype(m->type)>::type>(m->type) 
             << ", m->len = " << m->len;
+        if (message_callback_) {
+            message_callback_(conn, *m);
+        }
         buf->ConsumeBytes(data.size());
     }
 }
