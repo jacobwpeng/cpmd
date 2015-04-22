@@ -19,11 +19,17 @@ static_assert (std::is_pod<cpm::Message>::value, "Message must be POD type");
 namespace cpm {
     const int Message::kMinSize = offsetof(Message, data_);
     const int Message::kMaxSize = offsetof(Message, data_) + kMaxDataSize;
+    const uint32_t Message::kMagic = 0x87654321;
     Message Message::Default() {
         Message m;
         m.Clear();
+        m.magic_ = Message::kMagic;
         return m;
     }
+    alpha::Slice Message::Serialize() const {
+        return alpha::Slice(reinterpret_cast<const char*>(this), Size());
+    }
+
     alpha::Slice Message::Data() const {
         return alpha::Slice(data_, len_);
     }
@@ -59,11 +65,23 @@ namespace cpm {
         return kMinSize + len_;
     }
 
+    uint32_t Message::magic() const {
+        return magic_;
+    }
+
     Address Message::RemoteAddress() const {
         return to_;
     }
 
     Address Message::SourceAddress() const {
         return from_;
+    }
+
+    bool Message::Empty() const {
+        return len_ == 0;
+    }
+
+    bool Message::Check() const {
+        return magic_ == kMagic;
     }
 }

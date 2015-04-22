@@ -91,6 +91,7 @@ namespace cpm {
             LOG_INFO << "Initialize request from " << conn->PeerAddr();
             preserve_connection = HandleNodeInit(conn, req, &reply);
         } else if (req->type == ResolveRequestType::kLookupNode) {
+            LOG_INFO << "Node lookup request from " << conn->PeerAddr();
             preserve_connection = HandleNodeLookup(conn, req, &reply);
         } else {
             LOG_WARNING << "Unknown req->type = " << static_cast<int>(req->type);
@@ -131,39 +132,40 @@ namespace cpm {
 
     bool ResolveServer::HandleNodeLookup(alpha::TcpConnectionPtr& conn, 
             const ResolveRequest* req, ProtocolMessage* reply) {
+        DLOG_INFO << "req->self_addr = " << req->self_addr
+            << " req->peer_addr = " << req->peer_addr;
         //可能是timerid 或者是 node_addr
         assert (conn->HasContext());
         auto it = connections_.find(req->self_addr);
         if (it == connections_.end()) {
+            LOG_WARNING << "node doesn't initialized self before send ResolveRequest";
             return false;
         } else {
             auto node_addr = it->second->GetContext<Address::NodeAddressType>();
-            //没有初始化的连接
-            if (!node_addr) {
-                return false;
-            }
+            assert (node_addr);
             //客户端发送过来的自己的地址错误
             if (it->first != *node_addr) {
+                LOG_WARNING << "Node address mismatch, recorded = " << *node_addr
+                    << ", req->self_addr = " << req->self_addr;
                 return false;
             }
         }
         auto builder = ResolveResponse::Builder(reply);
-        //FIXME: check node_path is null-terminated
-        //FIXME: check node_path is valid
-        auto readable_addr = std::string(req->node_path);
-        auto addr = cpm::Address::Create(readable_addr);
-        auto node = conf_->GetNodeInfoByNodeAddress(addr.NodeAddress());
+        auto node = conf_->GetNodeInfoByNodeAddress(req->peer_addr);
+        builder.SetType(ResolveResponseType::kUpdateCache);
         if (node == nullptr) {
             builder.SetCode(ResolveServerError::kNodeNotFound);
+            builder.SetNodeAddress(req->peer_addr);
         } else {
-            assert (node->node_addr() == addr.NodeAddress());
+            assert (node->node_addr() == req->peer_addr);
             builder.SetCode(ResolveServerError::kOk);
-            builder.SetType(ResolveResponseType::kUpdateCache);
             builder.SetNodeIp(node->net_addr().ip());
             builder.SetNodePort(node->net_addr().port());
             builder.SetNodeAddress(node->node_addr());
             builder.SetNodePath(node->readable_addr());
         }
+        DLOG_INFO << "Code = " << static_cast<int>(
+                reply->as<const ResolveResponse*>()->code);
         return true;
     }
 }

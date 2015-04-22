@@ -12,6 +12,7 @@
 
 #include "cpm_server.h"
 
+#include <gflags/gflags.h>
 #include <alpha/compiler.h>
 #include <alpha/logger.h>
 #include <alpha/process_bus.h>
@@ -20,42 +21,34 @@
 #include <alpha/tcp_client.h>
 #include <alpha/tcp_server.h>
 #include <alpha/udp_server.h>
+#include "cpm_node.h"
 #include "cpm_message.h"
 #include "cpm_protocol.h"
 #include "cpm_client_info.h"
+#include "cpm_message_codec.h"
 #include "cpm_protocol_message_codec.h"
 
+DEFINE_int32(register_server_port, 8123, "Register server port(udp)");
+DEFINE_string(message_server_ip, "0.0.0.0", "Message server ip");
+DEFINE_int32(message_server_port, 8123, "Message server port(tcp)");
+
 namespace cpm {
-    const char* Server::kDefaultMessageServerIp = "0.0.0.0";
     Server::Server(alpha::EventLoop* loop, alpha::Slice bus_location)
-        :register_server_port_(kDefaultRegisterServerPort)
-         ,message_server_port_(kDefaultMessageServerPort)
+        :register_server_port_(FLAGS_register_server_port)
+         ,message_server_port_(FLAGS_message_server_port)
          ,self_address_(Address::kLocalNodeAddress) 
-         ,message_server_ip_(kDefaultMessageServerIp)
+         ,message_server_ip_(FLAGS_message_server_ip)
          ,loop_(loop), bus_location_(bus_location.ToString()) {
     }
 
     Server::~Server() = default;
 
-    Server& Server::SetMessageServerIp(alpha::Slice ip) {
-        message_server_ip_ = ip.ToString();
-        return *this;
-    }
-
-    Server& Server::SetMessageServerPort(int port) {
-        message_server_port_ = port;
-        return *this;
-    }
-
-    Server& Server::SetRegisterServerPort(int port) {
-        register_server_port_ = port;
-        return *this;
-    }
-
     bool Server::Run() {
         using namespace std::placeholders;
         loop_->set_period_functor(std::bind(&Server::HandleBusMessage, this, _1));
-
+        message_codec_.reset (new MessageCodec());
+        message_codec_->SetOnMessage(std::bind(
+            &Server::HandleRemoteNodeMessage, this, _1, _2));
         protocol_message_codec_.reset (new ProtocolMessageCodec());
         protocol_message_codec_->SetOnMessage(std::bind(
                     &Server::HandleResolveServerMessage, this, _1, _2));
@@ -66,6 +59,14 @@ namespace cpm {
                     &Server::HandleInitCommand, this, _1, _2, _3));
         register_server_->Start();
 
+        message_server_.reset (new alpha::TcpServer(loop_, 
+                    alpha::NetAddress(message_server_ip_, message_server_port_)));
+        message_server_->SetOnRead(std::bind(
+                    &MessageCodec::OnRead, message_codec_.get(), _1, _2));
+        if (!message_server_->Run()) {
+            return false;
+        }
+
         resolve_server_address_.reset (new alpha::NetAddress("127.0.0.1", 9999));
         client_.reset (new alpha::TcpClient(loop_));
         client_->SetOnConnected(std::bind(
@@ -75,6 +76,11 @@ namespace cpm {
         client_->SetOnClose(std::bind(
                     &Server::OnConnectToRemoteClose, this, _1));
         client_->ConnectTo(*resolve_server_address_);
+
+        LOG_INFO << "Register server at [UDP]127.0.0.1:" << register_server_port_;
+        LOG_INFO << "Message server at [TCP]" << message_server_ip_ 
+            << ":" << message_server_port_;
+        LOG_INFO << "Resolve server is [TCP]" << *resolve_server_address_;
         return true;
     }
 
@@ -104,16 +110,25 @@ namespace cpm {
 
     void Server::OnConnectedToRemoteNode(alpha::TcpConnectionPtr& conn) {
         LOG_INFO << "Connected to remote node " << conn->PeerAddr();
-        // 看看有没有缓存啥要发的
+        auto node = FindNodeByNetAddress(conn->PeerAddr());
+        assert (node);
+        node->SetConnection(conn);
     }
 
     void Server::OnConnectToRemoteNodeError(const alpha::NetAddress& addr) {
         LOG_WARNING << "Connect to remote node " << addr << " failed";
-        // 看看是不是要把缓存的内容给清空掉
+        // TODO: 几次之后清空缓存
+        Node* node = FindNodeByNetAddress(addr);
+        assert (node);
+        node->SetConnecting(false);
+        //TODO: 重试几次？
     }
 
     void Server::OnRemoteNodeDisconnected(alpha::TcpConnectionPtr& conn) {
-
+        LOG_WARNING << "Remote node disconnected, net_address = " << conn->PeerAddr();
+        auto node = FindNodeByNetAddress(conn->PeerAddr());
+        assert (node);
+        node->ClearConnection();
     }
 
     bool Server::IsResolveServerAddress(const alpha::NetAddress& addr) {
@@ -166,6 +181,33 @@ namespace cpm {
         return 0;
     }
 
+    bool Server::HandleRemoteMessage(const Message* m) {
+        auto remote_address = m->RemoteAddress();
+        if (remote_address.NodeAddress() != self_address_) {
+            LOG_WARNING << "Receive unexpected message"
+                << ", m->RemoteAddress().NodeAddress() = " << remote_address.NodeAddress()
+                << ", self_address_ = " << self_address_
+                << ", m->Size() = " << m->Size();
+            return false;
+        }
+
+        auto client_address = m->RemoteAddress().ClientAddress();
+        auto it = clients_.find(client_address);
+        if (it == clients_.end()) {
+            LOG_INFO << "Drop message from " << m->SourceAddress().ToString()
+                << " to " << m->RemoteAddress().ToString()
+                << ", loacl client is offline";
+        } else {
+            bool ok = it->second->WriteMessage(m);
+            LOG_INFO_IF(!ok) << "Drop message from " << m->SourceAddress().ToString()
+                << " to " << it->second->name()
+                << ", loacl client is full";
+            DLOG_INFO_IF(ok) << "Forward 1 message from " << m->SourceAddress().ToString()
+                << ", to " << it->second->name();
+        }
+        return true;
+    }
+
     int Server::HandleBusMessage(int64_t iteration) {
         bool busy = false;
         for (auto& p : clients_) {
@@ -176,18 +218,20 @@ namespace cpm {
                         p.second->addr().ClientAddress());
                 m->SetSourceAddress(source_address);
                 auto remote_addr = m->RemoteAddress();
-                if (remote_addr.NodeAddress() == self_address_) {
-                    HandleLocalMessage(m);
+                if (remote_addr.NodeAddress() == self_address_ 
+                        || remote_addr.NodeAddress() == 0) {
+                    HandleToLocalMessage(m);
                 } else {
-                    HandleRemoteMessage(m);
+                    HandleToRemoteMessage(m);
                 }
             }
         }
         return busy ? alpha::EventLoop::kBusy : alpha::EventLoop::kIdle;
     }
 
-    void Server::HandleLocalMessage(Message* m) {
-        assert (m->RemoteAddress().NodeAddress() == self_address_);
+    void Server::HandleToLocalMessage(Message* m) {
+        assert (m->RemoteAddress().NodeAddress() == self_address_
+                || m->RemoteAddress().NodeAddress() == 0);
         auto client_addr = m->RemoteAddress().ClientAddress(); 
         auto it = clients_.find(client_addr);
         auto source_name = clients_.find(m->SourceAddress().ClientAddress())->second->name();
@@ -198,27 +242,50 @@ namespace cpm {
             bool ok = it->second->WriteMessage(m);
             LOG_INFO_IF(!ok) << "Drop local message due to output bus full from " 
                 << source_name <<", to address " << it->second->name();
-            DLOG_INFO << "Forward 1 message from " << source_name
+            DLOG_INFO_IF(ok) << "Forward 1 message from " << source_name
                 << ", to " << it->second->name();
         }
     }
 
-    void Server::HandleRemoteMessage(Message* m) {
-        auto node_addr = m->RemoteAddress().NodeAddress();
-        auto iter = out_links_.find(node_addr);
-        auto data = alpha::Slice(reinterpret_cast<const char*>(m), m->Size());
-        if (iter != out_links_.end()) {
-            //已经建立过连接了
-            iter->second->Write(data);
-        } else {
-            auto it = cached_node_addresses_.find(node_addr);
-            if (it != cached_node_addresses_.end()) {
-                //没有建立连接，但是有对方的网络位置
-                client_->ConnectTo(it->second);
+    void Server::HandleToRemoteMessage(Message* m) {
+        LOG_INFO << "HandleToRemoteMessage, m->RemoteAddress() = "
+            << m->RemoteAddress().ToString();
+        auto node_address = m->RemoteAddress().NodeAddress();
+        auto node = FindNode(node_address);
+        auto droped = Message::Default();
+        if (node && !node->NotResolved()) {
+            if (node->Connected()) {
+                node->SendMessage(*m, &droped);
+            } else if (node->Connecting()) {
+                node->CacheMessage(*m, &droped);
+            } else if (node->Resolving()) {
+                node->CacheMessage(*m, &droped);
+            } else if (node->Resolved()) {
+                LOG_INFO << "Try connecto node, " << node->NetAddress();
+                RegisterNode(node);
+                client_->ConnectTo(node->NetAddress());
+                node->SetConnecting(true);
             } else {
-                //也没有缓存对方的位置，请求一个
             }
+        } else {
+            if (!node) {
+                node = AddNewNode(node_address);
+            }
+            assert (node->NotResolved());
+            if (resolve_server_conn_) {
+                //请求对应节点网络地址
+                ReqeustNodeNetAddress(node_address);
+                node->SetResolveState(Node::ResolveState::kResolving);
+            } else {
+                LOG_WARNING << "No connection to resolve server found";
+            }
+
+            node->CacheMessage(*m, &droped);
         }
+        LOG_WARNING_IF(!droped.Empty()) << "Drop message from local client(" 
+            << m->SourceAddress().ClientAddress()
+            << ") to remote " << m->RemoteAddress().ToString()
+            << ", size = " << droped.Size();
     }
 
     void Server::OnConnectedToResolveServer(alpha::TcpConnectionPtr& conn) {
@@ -230,6 +297,7 @@ namespace cpm {
         builder.SetType(ResolveRequestType::kInitializeSelf);
         builder.SetPort(message_server_port_);
         conn->Write(alpha::Slice(reinterpret_cast<const char*>(&m), m.size()));
+        resolve_server_conn_ = conn;
     }
 
     void Server::OnConnectedToResolveServerError(const alpha::NetAddress& addr) {
@@ -247,6 +315,7 @@ namespace cpm {
 
         auto * resp = m.as<const ResolveResponse*>();
         bool preserve_connection = false;
+        DLOG_INFO << "resp->type = " << static_cast<int>(resp->type);
         switch (resp->type) {
             case ResolveResponseType::kUpdateSelf:
                 preserve_connection = UpdateSelfAddress(resp);
@@ -264,14 +333,36 @@ namespace cpm {
         }
     }
 
+    void Server::HandleRemoteNodeMessage(alpha::TcpConnectionPtr& conn, const Message& m) {
+        bool preserve_connection = HandleRemoteMessage(&m);
+        if (!preserve_connection) {
+            conn->Close();
+        }
+    }
+
     void Server::OnResolveServerDisconnected(alpha::TcpConnectionPtr& conn) {
+        LOG_WARNING << "Resolve server disconnected, addr = " << conn->PeerAddr();
         ReconnectToResolveServer(conn->PeerAddr());
+        resolve_server_conn_.reset();
     }
 
     void Server::ReconnectToResolveServer(const alpha::NetAddress& addr) {
         static const int kRetryInterval = 2000; //2s
         loop_->RunAfter(kRetryInterval, std::bind(&alpha::TcpClient::ConnectTo,
                     client_.get(), addr));
+    }
+
+    void Server::ReqeustNodeNetAddress(Address::NodeAddressType node_address) {
+        DLOG_INFO << "node_address = " << node_address;
+        if (resolve_server_conn_ && !resolve_server_conn_->closed()) {
+            ProtocolMessage m;
+            auto builder = ResolveRequest::Builder(&m);
+            builder.SetSelfAddress(self_address_);
+            builder.SetType(ResolveRequestType::kLookupNode);
+            builder.SetPeerAddress(node_address);
+            resolve_server_conn_->Write(m.Serialize());
+            DLOG_INFO << "Send ResolveRequest, type = ResolveRequestType::kLookupNode";
+        }
     }
 
     bool Server::UpdateSelfAddress(const ResolveResponse* resp) {
@@ -290,21 +381,92 @@ namespace cpm {
     }
 
     bool Server::UpdateNodeAddressCache(const ResolveResponse* resp) {
-        auto node_addr = resp->node_addr;
-        alpha::NetAddress net_addr(resp->node_ip, resp->node_port);
-
-        auto it = cached_node_addresses_.find(node_addr);
-        if (it == cached_node_addresses_.end()) {
-            LOG_INFO << "Add new cache address, node_addr = " << node_addr
-                << ", path = " << resp->node_path
-                << ", net_addr = " << net_addr;
+        auto node_address = resp->node_addr;
+        auto node = FindNode(node_address);
+        alpha::NetAddress net_address(resp->node_ip, resp->node_port);
+        if (node && node->Resolved()) {
+            if (resp->code == ResolveServerError::kOk) {
+                LOG_INFO << "update cache address, node_address = " << node_address
+                    << ", path = " << resp->node_path
+                    << ", old net_addr = " << node->NetAddress()
+                    << ", new net_addr = " << net_address;
+                node->SetNetAddress(net_address);
+            } else {
+                switch (resp->code) {
+                    case ResolveServerError::kInvalidNode:
+                        LOG_INFO << "Invaid node, node_address = " << node_address;
+                        break;
+                    case ResolveServerError::kNodeNotFound:
+                        LOG_INFO << "Node not found, node_address = " << node_address;
+                        break;
+                    default:
+                        LOG_WARNING << "Unknown resp->code = "
+                            << static_cast<int>(resp->code);
+                        break;
+                }
+                node->SetResolveState(Node::ResolveState::kNotResolved);
+            }
         } else {
-            LOG_INFO << "update cache address, node_addr = " << node_addr
-                << ", path = " << resp->node_path
-                << ", old net_addr = " << it->second
-                << ", new net_addr = " << net_addr;
+            if (!node) {
+                //Resolve Server刷新cpmd地址缓存
+                assert (resp->code == ResolveServerError::kOk);
+                node = AddNewNode(node_address);
+                node->SetNetAddress(net_address);
+                LOG_INFO << "Add new cache address, node_address = " << node_address
+                    << ", path = " << resp->node_path
+                    << ", net_addr = " << net_address;
+            } else {
+                assert (!node->Resolved());
+                if (resp->code == ResolveServerError::kOk) {
+                    node->SetNetAddress(net_address);
+                    LOG_INFO << "Resolved node_address = " << node_address 
+                        << ", net_address = " << net_address
+                        << ", readable_address = " << resp->node_path;
+                } else {
+                    switch (resp->code) {
+                        case ResolveServerError::kInvalidNode:
+                            LOG_INFO << "Invaid node, node_address = " << node_address;
+                            break;
+                        case ResolveServerError::kNodeNotFound:
+                            LOG_INFO << "Node not found, node_address = " << node_address;
+                            break;
+                        default:
+                            LOG_WARNING << "Unknown resp->code = "
+                                << static_cast<int>(resp->code);
+                            break;
+                    }
+                }
+            }
+        }
+
+        assert (node);
+        if (node->HasCachedMessage() && !node->Connected() && node->Resolved()) {
+            client_->ConnectTo(node->NetAddress());
+            RegisterNode(node);
         }
         return true;
+    }
+
+    void Server::RegisterNode(Node* node) {
+        auto res = nodes_index_.emplace(node->NetAddress(), node);
+        assert (res.second);
+        (void)res;
+    }
+
+    Node* Server::AddNewNode(Address::NodeAddressType node_address) {
+        auto res = nodes_.emplace(node_address, NodePtr(new Node(node_address)));
+        assert (res.second);
+        return res.first->second.get();
+    }
+
+    Node* Server::FindNode(Address::NodeAddressType node_address) {
+        auto it = nodes_.find(node_address);
+        return it == nodes_.end() ? nullptr : it->second.get();
+    }
+
+    Node* Server::FindNodeByNetAddress(const alpha::NetAddress& net_address) {
+        auto it = nodes_index_.find(net_address);
+        return it == nodes_index_.end() ? nullptr : it->second;
     }
 
     std::string Server::GetInputBusPath(alpha::Slice name) const {

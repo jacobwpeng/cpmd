@@ -77,6 +77,8 @@ namespace cpm {
                 auto ip = subtree.get<std::string>("<xmlattr>.ip");
                 auto port = subtree.get<int>("<xmlattr>.port");
                 Node node(readable_addr, ip, port);
+                LOG_INFO << "readable_address = " << readable_addr
+                    << ", node_address = " << node.node_addr();
                 auto it = conf->nodes_.find(node.node_addr());
                 if (it != conf->nodes_.end()) {
                     LOG_ERROR << "Multiple node with same addr, addr = "

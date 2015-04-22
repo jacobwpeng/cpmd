@@ -19,6 +19,7 @@
 #include <alpha/slice.h>
 #include <alpha/tcp_connection.h>
 #include "cpm_address.h"
+#include "cpm_message_cache_queue.h"
 
 namespace alpha {
     class NetAddress;
@@ -29,10 +30,12 @@ namespace alpha {
 }
 
 namespace cpm {
+    class Node;
     class Message;
     class ClientInfo;
     struct ProtocolMessage;
     struct ResolveResponse;
+    class MessageCodec;
     class ProtocolMessageCodec;
     class Server {
         public:
@@ -46,17 +49,18 @@ namespace cpm {
             bool Run();
 
         private:
+            using NodePtr = std::unique_ptr<Node>;
             using ClientPtr = std::unique_ptr<ClientInfo>;
-            static const int kDefaultRegisterServerPort = 8123;
-            static const int kDefaultMessageServerPort = 8123;
-            static const char* kDefaultMessageServerIp;
+            static const int kMaxCacheMessageSize = 100;
 
             int HandleInitCommand(const char* data, int len, std::string* reply);
+            bool HandleRemoteMessage(const Message* m);
             int HandleBusMessage(int64_t);
-            void HandleLocalMessage(Message* m);
-            void HandleRemoteMessage(Message* m);
+            void HandleToLocalMessage(Message* m);
+            void HandleToRemoteMessage(Message* m);
             void HandleResolveServerMessage(alpha::TcpConnectionPtr& conn,
                     const ProtocolMessage& m);
+            void HandleRemoteNodeMessage(alpha::TcpConnectionPtr& conn, const Message& m);
             void OnConnectedToRemote(alpha::TcpConnectionPtr conn);
             void OnConnectToRemoteError(const alpha::NetAddress& addr);
             void OnConnectToRemoteClose(alpha::TcpConnectionPtr conn);
@@ -69,8 +73,14 @@ namespace cpm {
             void OnConnectToRemoteNodeError(const alpha::NetAddress& addr);
             void OnRemoteNodeDisconnected(alpha::TcpConnectionPtr& conn);
             void ReconnectToResolveServer(const alpha::NetAddress& addr);
+            void ReqeustNodeNetAddress(Address::NodeAddressType node_address);
             bool UpdateSelfAddress(const ResolveResponse* resp);
             bool UpdateNodeAddressCache(const ResolveResponse* resp);
+            void RegisterNode(Node* node);
+
+            Node* AddNewNode(Address::NodeAddressType node_address);
+            Node* FindNode(Address::NodeAddressType node_address);
+            Node* FindNodeByNetAddress(const alpha::NetAddress& net_address);
             std::string GetInputBusPath(alpha::Slice name) const;
             std::string GetOutputBusPath(alpha::Slice name) const;
             std::string GetBusPath(alpha::Slice fmt, alpha::Slice name) const;
@@ -81,15 +91,16 @@ namespace cpm {
             std::string message_server_ip_;
             alpha::EventLoop * loop_;
             std::string bus_location_;
+            alpha::TcpConnectionPtr resolve_server_conn_;
             std::unique_ptr<alpha::UdpServer> register_server_;
             std::unique_ptr<alpha::TcpServer> message_server_;
             std::unique_ptr<alpha::TcpClient> client_;
+            std::unique_ptr<MessageCodec> message_codec_;
             std::unique_ptr<ProtocolMessageCodec> protocol_message_codec_;
             std::unique_ptr<alpha::NetAddress> resolve_server_address_;
-            std::map<Address::NodeAddressType, alpha::TcpConnectionPtr> nodes_;
-            std::map<Address::NodeAddressType, alpha::TcpConnectionPtr> out_links_;
+            std::map<Address::NodeAddressType, NodePtr> nodes_;
+            std::map<alpha::NetAddress, Node*> nodes_index_;
             std::map<Address::ClientAddressType, ClientPtr> clients_;
-            std::map<Address::NodeAddressType, alpha::NetAddress> cached_node_addresses_;
     };
 }
 

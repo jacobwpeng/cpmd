@@ -15,6 +15,15 @@
 #include <cstring>
 
 namespace cpm {
+    int ProtocolMessage::size() const {
+        assert (len >= 0);
+        return offsetof(ProtocolMessage, data) + len;
+    }
+
+    alpha::Slice ProtocolMessage::Serialize() const {
+        return alpha::Slice(reinterpret_cast<const char*>(this), size());
+    }
+
     template<typename T>
     T& EnsureLength(T* cls, cpm::ProtocolMessage* m, size_t size) {
         if (m->len < size) {
@@ -61,7 +70,7 @@ namespace cpm {
     DefineFieldSetter(ResolveRequest, type, Type, ResolveRequestType)
     DefineFieldSetter(ResolveRequest, self_addr, SelfAddress, Address::NodeAddressType)
     DefineFieldSetter(ResolveRequest, cpmd_port, Port, int32_t)
-    DefineLastFieldSetter(ResolveRequest, node_path, NodePath)
+    DefineFieldSetter(ResolveRequest, peer_addr, PeerAddress, Address::NodeAddressType)
 
     DefineBuilderConstructor(ResolveResponse, MessageType::kResolveResponse);
     DefineFieldSetter(ResolveResponse, code, Code, cpm::ResolveServerError)

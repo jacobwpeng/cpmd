@@ -5,6 +5,8 @@ set(CPMD "cpmd")
 set(CPM_CLIENT "cpm_client")
 set(CPM_RESOLVE_SERVER "cpm_resolve_server")
 
+find_library(GFLAGS "gflags")
+
 #libcpm
 list(APPEND LIBCPM_SRCS "cpm_address.cc"
                         "cpm_message.cc"
@@ -26,12 +28,15 @@ target_link_libraries(${LIBCPM_SERVER} "alpha")
 
 #cpmd
 list(APPEND CPMD_SRCS "cpm_message.cc"
+                        "cpm_message_codec.cc"
+                        "cpm_node.cc"
+                        "cpm_message_cache_queue.cc"
                         "cpm_client_info.cc" 
                         "cpm_server.cc"
                         "cpm_main.cc"
                         )
 add_executable(${CPMD} ${CPMD_SRCS})
-target_link_libraries(${CPMD} ${LIBCPM_SERVER})
+target_link_libraries(${CPMD}  ${GFLAGS} ${LIBCPM_SERVER})
 
 #cpm client exmaple
 list(APPEND CPM_CLIENT_SRCS "cpm_client_main.cc")

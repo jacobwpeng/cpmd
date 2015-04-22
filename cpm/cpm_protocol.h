@@ -58,10 +58,8 @@ namespace cpm {
                 return reinterpret_cast<T>(data);
         }
 
-        int size() const {
-            assert (len >= 0);
-            return offsetof(ProtocolMessage, data) + len;
-        }
+        int size() const;
+        alpha::Slice Serialize() const;
     };
     static const int kMinProtocolMessageSize = offsetof(ProtocolMessage, data);
 
@@ -104,7 +102,7 @@ namespace cpm {
         ResolveRequestType type;
         Address::NodeAddressType self_addr;
         int32_t cpmd_port;
-        char node_path[kMaxNodePathSize];
+        Address::NodeAddressType peer_addr;
 
         class Builder {
             public:
@@ -112,7 +110,7 @@ namespace cpm {
                 Builder& SetType(ResolveRequestType type);
                 Builder& SetSelfAddress(Address::NodeAddressType addr);
                 Builder& SetPort(int32_t port);
-                Builder& SetNodePath(alpha::Slice path);
+                Builder& SetPeerAddress(Address::NodeAddressType peer_addr);
 
             private:
                 ProtocolMessage* m_;

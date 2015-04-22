@@ -30,6 +30,7 @@ namespace cpm {
             ClientAddressType ClientAddress() const;
 
             void Clear();
+            std::string ToString() const;
 
         private:
             static uint32_t Hash(alpha::Slice address);

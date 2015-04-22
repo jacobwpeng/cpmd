@@ -10,12 +10,24 @@
  * ==============================================================================
  */
 
+#include <unistd.h>
+#include <gflags/gflags.h>
 #include <alpha/logger.h>
 #include <alpha/event_loop.h>
 #include "cpm_server.h"
 
+DEFINE_bool(daemon, false, "Run as daemon");
+
 int main(int argc, char* argv[]) {
-    alpha::Logger::Init(argv[0], alpha::Logger::LogToStderr);
+    const char* name = argv[0];
+    gflags::SetUsageMessage("Cplusplus Port Mapper Daemon");
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
+    if (FLAGS_daemon) {
+        daemon(0, 0);
+        alpha::Logger::Init(name);
+    } else {
+        alpha::Logger::Init(name, alpha::Logger::LogToStderr);
+    }
     alpha::EventLoop loop;
     cpm::Server server(&loop, "/tmp");
     if (server.Run()) {

@@ -52,7 +52,7 @@ namespace cpm {
         assert (!addr.empty() && addr.back() != '/');
         auto pos = addr.rfind('/');
         *left = alpha::Slice(address.data() + pos + 1, address.size() - pos - 1);
-        return alpha::Slice(address.data(), pos);
+        return alpha::Slice(address.data(), pos + 1);
     }
 
     Address Address::CreateDirectly(NodeAddressType node_addr, 
@@ -127,5 +127,11 @@ namespace cpm {
 
     void Address::Clear() { 
         node_addr_ = client_addr_ = 0;
+    }
+
+    std::string Address::ToString() const {
+        char buf[100];
+        snprintf(buf, sizeof(buf), "Node(%u), Client(%u)", node_addr_, client_addr_);
+        return buf;
     }
 }
