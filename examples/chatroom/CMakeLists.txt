@@ -1,0 +1,8 @@
+file(GLOB SRCS "*.cc")
+list(APPEND CHAT_SERVER_SRCS "chat_server.cc" "chat_protocol.cc")
+list(APPEND CHAT_CLIENT_SRCS "chat_client.cc" "chat_protocol.cc")
+include_directories(${PROJECT_SOURCE_DIR})
+add_executable("chat_server" ${CHAT_SERVER_SRCS})
+add_executable("chat_client" ${CHAT_CLIENT_SRCS})
+target_link_libraries("chat_server" "alpha" "cpm")
+target_link_libraries("chat_client" "alpha" "cpm")
