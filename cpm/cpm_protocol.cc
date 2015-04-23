@@ -16,7 +16,6 @@
 
 namespace cpm {
     int ProtocolMessage::size() const {
-        assert (len >= 0);
         return offsetof(ProtocolMessage, data) + len;
     }
 
