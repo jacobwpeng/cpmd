@@ -31,6 +31,8 @@
 DEFINE_int32(register_server_port, 8123, "Register server port(udp)");
 DEFINE_string(message_server_ip, "0.0.0.0", "Message server ip");
 DEFINE_int32(message_server_port, 8123, "Message server port(tcp)");
+DEFINE_string(resolve_server_ip, "127.0.0.1", "Resolve server ip");
+DEFINE_int32(resolve_server_port, 9999, "Resolve server port");
 
 namespace cpm {
     Server::Server(alpha::EventLoop* loop, alpha::Slice bus_location)
@@ -67,7 +69,8 @@ namespace cpm {
             return false;
         }
 
-        resolve_server_address_.reset (new alpha::NetAddress("127.0.0.1", 9999));
+        resolve_server_address_.reset (new alpha::NetAddress(
+                    FLAGS_resolve_server_ip, FLAGS_resolve_server_port));
         client_.reset (new alpha::TcpClient(loop_));
         client_->SetOnConnected(std::bind(
                     &Server::OnConnectedToRemote, this, _1));

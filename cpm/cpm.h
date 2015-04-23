@@ -36,7 +36,7 @@ namespace cpm {
     class Client {
         public:
             static Status Create(Client** client, alpha::Slice name, 
-                    Options::Options options = Options());
+                    Options options = Options());
             static void Destroy(Client* client);
             virtual ~Client() = default;
 

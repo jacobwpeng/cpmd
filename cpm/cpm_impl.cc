@@ -74,7 +74,7 @@ namespace cpm {
         return Status::kBusEmpty;
     }
 
-    Status Client::Create(Client** client, alpha::Slice name, Options::Options options) {
+    Status Client::Create(Client** client, alpha::Slice name, Options options) {
         std::unique_ptr<ClientImpl> impl(new ClientImpl(name, options));
         auto status = impl->Init();
         if (status == Status::kOk) {

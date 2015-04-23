@@ -85,7 +85,6 @@ namespace cpm {
         //第一个请求必须是请求初始化自己的请求
         auto req = m.as<const ResolveRequest*>();
         ProtocolMessage reply;
-        auto builder = ResolveResponse::Builder(&reply);
         bool preserve_connection = true;
         if (req->type == ResolveRequestType::kInitializeSelf) {
             LOG_INFO << "Initialize request from " << conn->PeerAddr();
