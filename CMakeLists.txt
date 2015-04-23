@@ -15,5 +15,6 @@ include_directories(alpha)
 
 add_subdirectory(alpha)
 add_subdirectory(cpm)
+add_subdirectory(examples)
 #add_library(${LIB_CPMD_CLIENT} STATIC ${srcs})
 #add_subdirectory(example)

@@ -134,4 +134,13 @@ namespace cpm {
         snprintf(buf, sizeof(buf), "Node(%u), Client(%u)", node_addr_, client_addr_);
         return buf;
     }
+
+    bool operator==(const Address& lhs, const Address& rhs) {
+        return lhs.NodeAddress() == rhs.NodeAddress()
+            && lhs.ClientAddress() == rhs.ClientAddress();
+    }
+
+    bool operator!=(const Address& lhs, const Address& rhs) {
+        return !(lhs == rhs);
+    }
 }

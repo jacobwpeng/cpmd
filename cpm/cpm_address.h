@@ -43,6 +43,9 @@ namespace cpm {
             NodeAddressType node_addr_;
             ClientAddressType client_addr_;
     };
+
+    bool operator==(const Address& lhs, const Address& rhs);
+    bool operator!=(const Address& lhs, const Address& rhs);
 }
 #endif   /* ----- #ifndef __CPM_ADDRESS_H__  ----- */
 

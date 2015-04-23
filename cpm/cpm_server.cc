@@ -176,9 +176,9 @@ namespace cpm {
             assert (output_bus_path.size() < sizeof(reply->output_tunnel_path));
             //对方的output就是我们的input
             ::strncpy(reply->output_tunnel_path, input_bus_path.data(), 
-                    input_bus_path.size());
+                    sizeof(reply->output_tunnel_path));
             ::strncpy(reply->input_tunnel_path, output_bus_path.data(), 
-                    output_bus_path.size());
+                    sizeof(reply->input_tunnel_path));
         }
         *out = alpha::Slice(&m).ToString();
         return 0;
