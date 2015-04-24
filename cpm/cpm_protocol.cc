@@ -37,6 +37,7 @@ namespace cpm {
 #define DefineBuilderConstructor(Type, MessageType)                            \
     Type::Builder::Builder(ProtocolMessage* m)                                 \
     :m_(m) {                                                                   \
+        ::memset(m_, 0x0, sizeof(ProtocolMessage));                            \
         m_->magic = kProtocolMessageMagic;                                     \
         m_->type = MessageType;                                                \
         m_->len = 0;                                                           \
