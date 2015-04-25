@@ -124,6 +124,7 @@ namespace cpm {
         Node* node = FindNodeByNetAddress(addr);
         assert (node);
         node->SetConnecting(false);
+        UnRegisterNode(node);
         //TODO: 重试几次？
     }
 
@@ -132,6 +133,7 @@ namespace cpm {
         auto node = FindNodeByNetAddress(conn->PeerAddr());
         assert (node);
         node->ClearConnection();
+        UnRegisterNode(node);
     }
 
     bool Server::IsResolveServerAddress(const alpha::NetAddress& addr) {
@@ -451,9 +453,17 @@ namespace cpm {
     }
 
     void Server::RegisterNode(Node* node) {
+        assert (node);
         auto res = nodes_index_.emplace(node->NetAddress(), node);
         assert (res.second);
         (void)res;
+    }
+
+    void Server::UnRegisterNode(Node* node) {
+        assert (node);
+        auto it = nodes_index_.find(node->NetAddress());
+        assert (it != nodes_index_.end());
+        nodes_index_.erase(it);
     }
 
     Node* Server::AddNewNode(Address::NodeAddressType node_address) {

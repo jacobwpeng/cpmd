@@ -77,6 +77,7 @@ namespace cpm {
             bool UpdateSelfAddress(const ResolveResponse* resp);
             bool UpdateNodeAddressCache(const ResolveResponse* resp);
             void RegisterNode(Node* node);
+            void UnRegisterNode(Node* node);
 
             Node* AddNewNode(Address::NodeAddressType node_address);
             Node* FindNode(Address::NodeAddressType node_address);
