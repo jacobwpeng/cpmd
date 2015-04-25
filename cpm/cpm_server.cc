@@ -47,7 +47,7 @@ namespace cpm {
 
     bool Server::Run() {
         using namespace std::placeholders;
-        loop_->set_period_functor(std::bind(&Server::HandleBusMessage, this, _1));
+        loop_->set_cron_functor(std::bind(&Server::HandleBusMessage, this, _1));
         message_codec_.reset (new MessageCodec());
         message_codec_->SetOnMessage(std::bind(
             &Server::HandleRemoteNodeMessage, this, _1, _2));
@@ -55,11 +55,13 @@ namespace cpm {
         protocol_message_codec_->SetOnMessage(std::bind(
                     &Server::HandleResolveServerMessage, this, _1, _2));
 
-        register_server_.reset (new alpha::UdpServer(loop_, "127.0.0.1", 
-                    register_server_port_));
-        register_server_->set_read_callback(std::bind(
-                    &Server::HandleInitCommand, this, _1, _2, _3));
-        register_server_->Start();
+        register_server_.reset (new alpha::UdpServer(loop_));
+        bool ok = register_server_->Start(
+                alpha::NetAddress("127.0.0.1", register_server_port_),
+                std::bind(&Server::HandleInitCommand, this, _1, _2));
+        if (!ok) {
+            return false;
+        }
 
         message_server_.reset (new alpha::TcpServer(loop_, 
                     alpha::NetAddress(message_server_ip_, message_server_port_)));
@@ -140,20 +142,18 @@ namespace cpm {
         return addr == *resolve_server_address_;
     }
 
-    int Server::HandleInitCommand(const char* data, int len, std::string* out) {
-        if (unlikely(len != static_cast<int>(sizeof(ProtocolMessage)))) {
+    ssize_t Server::HandleInitCommand(alpha::Slice data, char* out) {
+        if (unlikely(data.size() != static_cast<int>(sizeof(ProtocolMessage)))) {
             //TODO: HexDump(data)
-            LOG_WARNING << "Truncated ProtocolMessage, len = " << len;
+            LOG_WARNING << "Invalid ProtocolMessage, len = " << data.size();
             return -1;
         }
 
-        alpha::Slice received(data, len);
-
         //TODO: Check MagicNum
-        auto * req = received.as<ProtocolMessage>()->as<const HandShakeRequest*>();
+        auto * req = data.as<ProtocolMessage>()->as<const HandShakeRequest*>();
         //TODO: Check buffer_size
-        ProtocolMessage m;
-        auto * reply = m.as<HandShakeResponse*>();
+        ProtocolMessage* m = reinterpret_cast<ProtocolMessage*>(out);
+        auto * reply = m->as<HandShakeResponse*>();
         //TODO: check req->name
         LOG_INFO << "HandShakeRequest from " << req->name;
 
@@ -182,8 +182,7 @@ namespace cpm {
             ::strncpy(reply->input_tunnel_path, output_bus_path.data(), 
                     sizeof(reply->input_tunnel_path));
         }
-        *out = alpha::Slice(&m).ToString();
-        return 0;
+        return sizeof(ProtocolMessage);
     }
 
     bool Server::HandleRemoteMessage(const Message* m) {

@@ -53,7 +53,7 @@ namespace cpm {
             using ClientPtr = std::unique_ptr<ClientInfo>;
             static const int kMaxCacheMessageSize = 100;
 
-            int HandleInitCommand(const char* data, int len, std::string* reply);
+            ssize_t HandleInitCommand(alpha::Slice data, char* out);
             bool HandleRemoteMessage(const Message* m);
             int HandleBusMessage(int64_t);
             void HandleToLocalMessage(Message* m);

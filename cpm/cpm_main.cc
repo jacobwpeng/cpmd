@@ -11,12 +11,22 @@
  */
 
 #include <unistd.h>
+#include <vector>
 #include <gflags/gflags.h>
 #include <alpha/logger.h>
 #include <alpha/event_loop.h>
 #include "cpm_server.h"
 
 DEFINE_bool(daemon, false, "Run as daemon");
+
+bool HandlerSignals(alpha::EventLoop* loop, std::initializer_list<int> signals,
+        const alpha::EventLoop::Functor& functor) {
+    bool ok = true;
+    std::for_each(signals.begin(), signals.end(), [loop, &ok, &functor](int signo){
+            ok = ok && loop->TrapSignal(signo, functor);
+    });
+    return ok;
+}
 
 int main(int argc, char* argv[]) {
     const char* name = argv[0];
@@ -30,6 +40,11 @@ int main(int argc, char* argv[]) {
     }
     alpha::EventLoop loop;
     cpm::Server server(&loop, "/tmp");
+    //忽略以下信号
+    HandlerSignals(&loop, {SIGPIPE}, [&loop]{ loop.Quit(); });
+    //以下信号退出
+    HandlerSignals(&loop, {SIGINT, SIGQUIT, SIGTERM}, [&loop]{ loop.Quit(); });
+
     if (server.Run()) {
         loop.Run();
     }
