@@ -353,7 +353,7 @@ namespace cpm {
     void Server::ReconnectToResolveServer(const alpha::NetAddress& addr) {
         static const int kRetryInterval = 2000; //2s
         loop_->RunAfter(kRetryInterval, std::bind(&alpha::TcpClient::ConnectTo,
-                    client_.get(), addr));
+                    client_.get(), addr, false));
     }
 
     void Server::ReqeustNodeNetAddress(Address::NodeAddressType node_address) {
