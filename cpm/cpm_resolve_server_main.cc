@@ -15,7 +15,7 @@
 #include "cpm_resolve_server.h"
 
 int main(int argc, char* argv[]) {
-    alpha::Logger::Init(argv[0], alpha::Logger::LogToStderr);
+    alpha::Logger::Init(argv[0]);
     if (argc != 2) {
         LOG_ERROR << "Usage: " << argv[0] << " conf";
         return EXIT_FAILURE;

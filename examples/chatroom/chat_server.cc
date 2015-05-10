@@ -35,7 +35,7 @@ bool BroadcastMessage(cpm::Client* client, const MemberMap& members, cpm::Addres
 }
 
 int main(int argc, char* argv[]) {
-    alpha::Logger::Init(argv[0], alpha::Logger::LogToStderr);
+    alpha::Logger::Init(argv[0]);
     cpm::Client * client;
     auto status = cpm::Client::Create(&client, "chatroom");
     if (status != cpm::Status::kOk) {

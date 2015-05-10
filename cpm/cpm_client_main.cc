@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
 
     cpm::Options options;
     options.SetServerPort(register_server_port);
-    alpha::Logger::Init(argv[0], alpha::Logger::LogToStderr);
+    alpha::Logger::Init(argv[0]);
     LOG_INFO << "register_server_port = " << register_server_port
         << ", name = " << name 
         << ", target = " << target;

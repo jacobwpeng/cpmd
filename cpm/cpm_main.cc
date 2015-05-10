@@ -29,15 +29,10 @@ bool HandlerSignals(alpha::EventLoop* loop, std::initializer_list<int> signals,
 }
 
 int main(int argc, char* argv[]) {
-    const char* name = argv[0];
+    alpha::Logger::Init(argv[0]);
     gflags::SetUsageMessage("Cplusplus Port Mapper Daemon");
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-    if (FLAGS_daemon) {
-        daemon(0, 0);
-        alpha::Logger::Init(name);
-    } else {
-        alpha::Logger::Init(name, alpha::Logger::LogToStderr);
-    }
+    if (FLAGS_daemon) { daemon(0, 0); }
     alpha::EventLoop loop;
     cpm::Server server(&loop, "/tmp");
     //忽略以下信号

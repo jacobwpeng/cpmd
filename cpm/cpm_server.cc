@@ -81,6 +81,9 @@ namespace cpm {
         client_->SetOnClose(std::bind(
                     &Server::OnConnectToRemoteClose, this, _1));
         client_->ConnectTo(*resolve_server_address_);
+        loop_->RunEvery(1000, [this]{
+            LOG_INFO << "Connections: " << message_server_->connections_count();
+        });
 
         LOG_INFO << "Register server at [UDP]127.0.0.1:" << register_server_port_;
         LOG_INFO << "Message server at [TCP]" << message_server_ip_ 

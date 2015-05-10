@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Usage: " << argv[0] << " chatroom_address name\n";
         return EXIT_FAILURE;
     }
-    alpha::Logger::Init(argv[0], alpha::Logger::LogToStderr);
+    alpha::Logger::Init(argv[0]);
 
     auto chatroom_address = cpm::Address::Create(argv[1]);
     std::string name = argv[2];
@@ -56,6 +56,7 @@ int main(int argc, char* argv[]) {
     const int kTimeout = 500;
     fds[0].fd = STDIN_FILENO;
     fds[0].events = POLLIN;
+    int idle = 0;
     while (1) {
         int ret = ::poll(fds, 1, kTimeout);
         if (ret > 0) {
@@ -81,6 +82,17 @@ int main(int argc, char* argv[]) {
             }
         } else if (ret == 0) {
             //timeout
+            //if (++idle == 3) {
+            //    chat_message = builder.SetType(chat::MessageType::kHeartBeat).SetName(name).Finish();
+            //    m.SetData(&chat_message);
+            //    status = client->SendMessage(&m);
+            //    if (status != cpm::Status::kOk) {
+            //        std::cout << "SendMessage failed, status = " 
+            //            << static_cast<int>(status) << '\n';
+            //        return EXIT_FAILURE;
+            //    }
+            //    idle = 0;
+            //}
         } else {
             ::perror("poll");
             return EXIT_FAILURE;
