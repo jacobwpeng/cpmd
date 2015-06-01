@@ -71,6 +71,7 @@ namespace cpm {
             void OnResolveServerDisconnected(alpha::TcpConnectionPtr& conn);
             void OnConnectedToRemoteNode(alpha::TcpConnectionPtr& conn);
             void OnConnectToRemoteNodeError(const alpha::NetAddress& addr);
+            void OnRemoteNodeConnected(alpha::TcpConnectionPtr conn);
             void OnRemoteNodeDisconnected(alpha::TcpConnectionPtr& conn);
             void ReconnectToResolveServer(const alpha::NetAddress& addr);
             void ReqeustNodeNetAddress(Address::NodeAddressType node_address);
@@ -88,6 +89,7 @@ namespace cpm {
 
             int register_server_port_;
             int message_server_port_;
+            int connected_nodes_ = 0;
             Address::NodeAddressType self_address_;
             std::string message_server_ip_;
             alpha::EventLoop * loop_;
